@@ -73,6 +73,26 @@ f_add_css(
         padding: 1rem;
         z-index: 111;
     }
+    canvas{
+        position:fixed;
+        top:0;
+        left:0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+    }
+    #app {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 10;
+        pointer-events: none;
+    }
+    #app > * {
+        pointer-events: auto;
+    }
     ${
         f_s_css_from_o_variables(
             o_variables
@@ -88,14 +108,16 @@ let o_blob_stl = null;
 // let a_o_category = await(await(fetch('https://api.sketchfab.com/v3/categories'))).json()
 
 
+// Create canvas element separately (not inside Vue app)
+let o_canvas_element = document.createElement('canvas');
+o_canvas_element.id = 'canvas';
+document.body.appendChild(o_canvas_element);
+
+// Create app container
 let o = await f_o_html_from_o_js(
     {
         id: "app",
-        a_o: [
-            {
-                s_tag: "canvas",
-            }
-        ]
+        a_o: []
     }
 );
 document.body.appendChild(o);
@@ -111,8 +133,6 @@ const app = createApp({
     async mounted() {
             let o_self = this;
             globalThis.o_self = this;
-            globalThis.o_self = this;
-            o_self.o_video = null;
 
             let b_new_object = true;
             let s_id = window.location.hash.replace('#', '');
@@ -122,17 +142,27 @@ const app = createApp({
                 b_new_object = false;
             }
 
+        globalThis.o_canvas = document.querySelector('canvas');
+
+        f_init_sketch_js_stuff();
+
         if(b_new_object){
             o_self.o_object.s_id = crypto.randomUUID();
+            o_self.o_object.n_scl_x_px = window.innerWidth;
+            o_self.o_object.n_scl_y_px = window.innerHeight;
             window.location.hash = o_self.o_object.s_id;
             await o_self.f_set_websocket_uuid(o_self.o_object.s_id);
+
             o_self.o_object.a_o_path.push(
                 reactive(
                     f_o_todoitem('this is your first todo item. click the square to mark it as done. click the trash can to delete it. click the color button to change its color. add more items with the input field at the bottom. everything is saved automatically. you can also import/export your list with the settings button ⚙️. have fun!')
                 ),
             )
             await o_self.f_update_o_object();
+            debugger
         }
+        o_canvas.width = o_self.o_object.n_scl_x_px;
+        o_canvas.height = o_self.o_object.n_scl_y_px;
         
 
         // triggered when a message is received from the server
@@ -505,7 +535,7 @@ const app = createApp({
     },
     computed:{
 
-        },
+    },
     watch: {
     },
   data() {
@@ -528,6 +558,8 @@ const app = createApp({
         s_uuid_selected: null,
         o_object: {
             s_id: '',
+            n_scl_x_px: 300,
+            n_scl_y_px: 300,
             // n_ts_ms_last_downloaded_backup: new Date().getTime(),
             a_o_path: [
             ],
@@ -538,6 +570,82 @@ const app = createApp({
   }
 })
 
+
+let f_init_sketch_js_stuff = function(){
+
+    // sketchjs stuff
+    // Access Paper.js from the global window/paper object
+    const { Base, Path, Point, PointText } = window.paper;
+
+    // Setup Paper.js with the canvas
+    window.paper.setup(document.querySelector('canvas'));
+
+    var path = new Path();
+    var textItem = new PointText({
+        content: 'Click and drag to draw a line.',
+        point: new Point(20, 30),
+        fillColor: 'black',
+    });
+    
+    // Use Paper.js's Tool system for mouse events
+    // Paper.js Tool provides event.point automatically
+    var tool = new window.paper.Tool();
+
+    console.log('Paper.js tool created:', tool);
+
+    tool.onMouseDown = function(event) {
+        console.log('mousedown event:', event);
+        // If we produced a path before, deselect it:
+        if (path) {
+            path.selected = false;
+        }
+
+        // Create a new path and set its stroke color to black:
+        path = new Path({
+            segments: [event.point],
+            strokeColor: 'black',
+            // Select the path, so we can see its segment points:
+            fullySelected: true
+        });
+    }
+
+    // While the user drags the mouse, points are added to the path
+    // at the position of the mouse:
+    tool.onMouseDrag = function(event) {
+        path.add(event.point);
+
+        // Update the content of the text item to show how many
+        // segments it has:
+        textItem.content = 'Segment count: ' + path.segments.length;
+    }
+
+    // When the mouse is released, we simplify the path:
+    tool.onMouseUp = function(event) {
+        var segmentCount = path.segments.length;
+
+        // When the mouse is released, simplify it:
+        path.simplify(10);
+
+        // Select the path, so we can see its segments:
+        path.fullySelected = true;
+
+        var newSegmentCount = path.segments.length;
+        var difference = segmentCount - newSegmentCount;
+        var percentage = 100 - Math.round(newSegmentCount / segmentCount * 100);
+        textItem.content = difference + ' of the ' + segmentCount + ' segments were removed. Saving ' + percentage + '%';
+    }
+   	// // Create a Paper.js Path to draw a line into it:
+	// var path = new Path();
+	// // Give the stroke a color
+	// path.strokeColor = 'black';
+	// var start = new Point(100, 100);
+	// // Move to start and draw a line from there
+	// path.moveTo(start);
+	// // Note the plus operator on Point objects.
+	// // PaperScript does that for us, and much more!
+	// path.lineTo(start + [ 100, -50 ]);
+
+}    
 
 app.mount('#app')
 
