@@ -22,7 +22,12 @@ import {
 } from './functions.module.js'
 
 import {
-    a_o_websocket_function
+    a_o_websocket_function,
+    o_websocket_function_write,
+    o_websocket_function_set_uuid_hashed,
+    o_websocket_function_payload_is_a_n_u8_encrypted_o_list,
+    o_websocket_function_update_o_object,
+    o_websocket_function_read_o_object
 } from "./runtimedata.module.js"
 
 const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
@@ -153,14 +158,10 @@ const app = createApp({
             window.location.hash = o_self.o_object.s_id;
             await o_self.f_set_websocket_uuid(o_self.o_object.s_id);
 
-            o_self.o_object.a_o_path.push(
-                reactive(
-                    f_o_todoitem('this is your first todo item. click the square to mark it as done. click the trash can to delete it. click the color button to change its color. add more items with the input field at the bottom. everything is saved automatically. you can also import/export your list with the settings button ⚙️. have fun!')
-                ),
-            )
             await o_self.f_update_o_object();
             debugger
         }
+        debugger
         o_canvas.width = o_self.o_object.n_scl_x_px;
         o_canvas.height = o_self.o_object.n_scl_y_px;
         
@@ -179,7 +180,7 @@ const app = createApp({
                 console.error('could not find function with id '+n_id_websocket_function);
                 return;
             }
-            if(o_websocket_function.s_name == 'update_o_object'){
+            if(o_websocket_function.s_name == o_websocket_function_update_o_object.s_name){
       
                 let o_self = globalThis.o_self;
                 let a_n_u8_encrypted = a_n_u8_payload.slice(1);
@@ -193,7 +194,7 @@ const app = createApp({
                 }
             
             }
-            if(o_websocket_function.s_name == 'payload_is_a_n_u8_encrypted_o_object'){
+            if(o_websocket_function.s_name == o_websocket_function_payload_is_a_n_u8_encrypted_o_list.s_name){
                 let a_n_u8_encrypted = a_n_u8_data;
 
                 if(a_n_u8_encrypted.length == 0){

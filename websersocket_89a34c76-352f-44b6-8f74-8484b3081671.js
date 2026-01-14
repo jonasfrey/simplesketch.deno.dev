@@ -16,7 +16,12 @@ import {
 } from "https://deno.land/x/handyhelpers@5.0.0/mod.js"
 
 import {
-    a_o_websocket_function
+    a_o_websocket_function, 
+    o_websocket_function_payload_is_a_n_u8_encrypted_o_list,
+    o_websocket_function_read_o_object,
+    o_websocket_function_set_uuid_hashed,
+    o_websocket_function_update_o_object,
+    o_websocket_function_write
 } from "./localhost/runtimedata.module.js";
 
 let s_path_abs_file_current = new URL(import.meta.url).pathname;
@@ -112,7 +117,7 @@ let f_handler = async function(o_request){
                 console.error('could not find function with id '+n_id_websocket_function);
                 return;
             }
-            if(o_websocket_function.s_name == 'set_uuid_hashed'){
+            if(o_websocket_function.s_name == o_websocket_function_set_uuid_hashed.s_name){
                 let s_uuid_hashed = new TextDecoder().decode(
                     a_n_u8_data
                 );
@@ -127,12 +132,12 @@ let f_handler = async function(o_request){
                     return;
                 }
                 let a_n_u8_payload = new Uint8Array(1 + a_n_u8_o_object.length);
-                a_n_u8_payload[0] = a_o_websocket_function.find(o=>o.s_name=='payload_is_a_n_u8_encrypted_o_object').n_id;
+                a_n_u8_payload[0] = a_o_websocket_function.find(o=>o.s_name==o_websocket_function_payload_is_a_n_u8_encrypted_o_list.s_name).n_id;
                 a_n_u8_payload.set(a_n_u8_o_object, 1);
                 o_socket.send(a_n_u8_payload);
                 return;
             }
-            if(o_websocket_function.s_name == 'update_o_object'){
+            if(o_websocket_function.s_name == o_websocket_function_update_o_object.s_name){
 
                 let a_n_u8_payload = a_n_u8_data;
                 const view = new DataView(a_n_u8_payload.buffer);
@@ -167,7 +172,7 @@ let f_handler = async function(o_request){
                     .filter(o=>o.s_uuid_hashed == o_ws_client.s_uuid_hashed)
                     .forEach(o=>{
                         let a_n_u8_payload = new Uint8Array(1 + a_n_u8_encrypted.length);
-                        a_n_u8_payload[0] = a_o_websocket_function.find(o=>o.s_name=='payload_is_a_n_u8_encrypted_o_object').n_id;
+                        a_n_u8_payload[0] = a_o_websocket_function.find(o=>o.s_name==o_websocket_function_payload_is_a_n_u8_encrypted_o_list.s_name).n_id;
                         a_n_u8_payload.set(a_n_u8_encrypted, 1);
                         o.o_socket.send(a_n_u8_payload)
 
@@ -175,7 +180,7 @@ let f_handler = async function(o_request){
 
                 return;
             }
-            if(o_websocket_function.s_name == 'read_o_object'){
+            if(o_websocket_function.s_name == o_websocket_function_read_o_object.s_name){
                 
                 let s_uuid_hashed = new TextDecoder().decode(
                     a_n_u8_data
@@ -189,7 +194,7 @@ let f_handler = async function(o_request){
                     return;
                 }
                 let a_n_u8_payload = new Uint8Array(1 + a_n_u8_o_object.length);
-                a_n_u8_payload[0] = a_o_websocket_function.find(o=>o.s_name=='payload_is_a_n_u8_encrypted_o_object').n_id;
+                a_n_u8_payload[0] = a_o_websocket_function.find(o=>o.s_name==o_websocket_function_payload_is_a_n_u8_encrypted_o_list.s_name).n_id;
                 a_n_u8_payload.set(a_n_u8_o_object, 1);
                 o_socket.send(a_n_u8_payload);
                 return;
