@@ -17,12 +17,13 @@ import {
 
 import {
     a_o_websocket_function, 
-    o_websocket_function_payload_is_a_n_u8_encrypted_o_list,
+    o_websocket_function_payload_is_a_n_u8_encrypted_o_object,
     o_websocket_function_read_o_object,
     o_websocket_function_set_uuid_hashed,
     o_websocket_function_update_o_object,
     o_websocket_function_write
 } from "./localhost/runtimedata.module.js";
+import { f_o_websocket_function_from_n_id } from "./localhost/functions.module.js";
 
 let s_path_abs_file_current = new URL(import.meta.url).pathname;
 let s_path_abs_folder_current = s_path_abs_file_current.split('/').slice(0, -1).join('/');
@@ -77,6 +78,8 @@ let f_a_n_u8_o_object = async function(s_id_hashed){
 
 }
 
+
+
 let f_handler = async function(o_request){
 
     // websocket 'request' handling here
@@ -109,14 +112,8 @@ let f_handler = async function(o_request){
             let n_id_websocket_function = a_n_u8_payload[0];
             let a_n_u8_data = a_n_u8_payload.slice(1);
             
-            let o_websocket_function = a_o_websocket_function.find(o=>{
-                return o.n_id == n_id_websocket_function
-            });
+            let o_websocket_function = f_o_websocket_function_from_n_id(n_id_websocket_function, a_o_websocket_function);
 
-            if(!o_websocket_function){
-                console.error('could not find function with id '+n_id_websocket_function);
-                return;
-            }
             if(o_websocket_function.s_name == o_websocket_function_set_uuid_hashed.s_name){
                 let s_uuid_hashed = new TextDecoder().decode(
                     a_n_u8_data
@@ -132,7 +129,7 @@ let f_handler = async function(o_request){
                     return;
                 }
                 let a_n_u8_payload = new Uint8Array(1 + a_n_u8_o_object.length);
-                a_n_u8_payload[0] = a_o_websocket_function.find(o=>o.s_name==o_websocket_function_payload_is_a_n_u8_encrypted_o_list.s_name).n_id;
+                a_n_u8_payload[0] = a_o_websocket_function.find(o=>o.s_name==o_websocket_function_payload_is_a_n_u8_encrypted_o_object.s_name).n_id;
                 a_n_u8_payload.set(a_n_u8_o_object, 1);
                 o_socket.send(a_n_u8_payload);
                 return;
@@ -166,13 +163,14 @@ let f_handler = async function(o_request){
                 // let v_list = await o_kv.set([s_prefix, `o_object`,s_id_hashed], a_n_u8_encrypted);
                 
                 // console.log(`created list or written to list: ${s_id_hashed}`)
-                //send list to all other clients with same s_uuid_hashed and different s_uuidv4
+                //send data to all other clients with same s_uuid_hashed and different s_uuidv4
+
                 a_o_ws_client
                     .filter(o=>o!=o_ws_client)  // send to all other clients, comment out to send to all clients
                     .filter(o=>o.s_uuid_hashed == o_ws_client.s_uuid_hashed)
                     .forEach(o=>{
                         let a_n_u8_payload = new Uint8Array(1 + a_n_u8_encrypted.length);
-                        a_n_u8_payload[0] = a_o_websocket_function.find(o=>o.s_name==o_websocket_function_payload_is_a_n_u8_encrypted_o_list.s_name).n_id;
+                        a_n_u8_payload[0] = o_websocket_function_payload_is_a_n_u8_encrypted_o_object.n_id;
                         a_n_u8_payload.set(a_n_u8_encrypted, 1);
                         o.o_socket.send(a_n_u8_payload)
 
@@ -194,7 +192,7 @@ let f_handler = async function(o_request){
                     return;
                 }
                 let a_n_u8_payload = new Uint8Array(1 + a_n_u8_o_object.length);
-                a_n_u8_payload[0] = a_o_websocket_function.find(o=>o.s_name==o_websocket_function_payload_is_a_n_u8_encrypted_o_list.s_name).n_id;
+                a_n_u8_payload[0] = a_o_websocket_function.find(o=>o.s_name==o_websocket_function_payload_is_a_n_u8_encrypted_o_object.s_name).n_id;
                 a_n_u8_payload.set(a_n_u8_o_object, 1);
                 o_socket.send(a_n_u8_payload);
                 return;

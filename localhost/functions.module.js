@@ -222,11 +222,31 @@ let f_s_error_from_s_prop_value =  function(s_prop, value) {
   
     return '';
   }
+
+  let f_o_websocket_function_from_n_id = function(n_id, a_o_websocket_function){
+    let o = a_o_websocket_function.find(o=>{
+        return o.n_id == n_id
+    });
+    // console.log("Received websocket message:" , JSON.stringify(
+    //     o_websocket_function,
+    //     null, 
+    //     4
+    // ));
+    // console.log("Payload data:", a_n_u8_data);
+    if(!o){
+        console.error('could not find function with id '+n_id_websocket_function);
+        throw error('could not find function with id '+n_id_websocket_function);
+        return;
+    }
+    return o
+}
+
 export {
     uuidToArrayBuffer,
     f_s_hashed_sha256,
     f_a_n_u8_encrypted_from_string,
     f_s_dectrypted_from_a_n_u8,
     f_o_todoitem, 
+    f_o_websocket_function_from_n_id
     
 }

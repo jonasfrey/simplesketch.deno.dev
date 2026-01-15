@@ -18,14 +18,15 @@ import {
     f_o_todoitem, 
     f_s_hashed_sha256,
     f_s_dectrypted_from_a_n_u8,
-    f_a_n_u8_encrypted_from_string
+    f_a_n_u8_encrypted_from_string,
+    f_o_websocket_function_from_n_id
 } from './functions.module.js'
 
 import {
     a_o_websocket_function,
     o_websocket_function_write,
     o_websocket_function_set_uuid_hashed,
-    o_websocket_function_payload_is_a_n_u8_encrypted_o_list,
+    o_websocket_function_payload_is_a_n_u8_encrypted_o_object,
     o_websocket_function_update_o_object,
     o_websocket_function_read_o_object
 } from "./runtimedata.module.js"
@@ -167,32 +168,41 @@ const app = createApp({
         // triggered when a message is received from the server
         o_ws.addEventListener("message",async (o_e) => {
 
+
             let a_n_u8_payload = new Uint8Array(o_e.data);
 
             let n_id_websocket_function = a_n_u8_payload[0];
             let a_n_u8_data = a_n_u8_payload.slice(1);
-            let o_websocket_function = a_o_websocket_function.find(o=>{
-                return o.n_id == n_id_websocket_function
-            });
-            if(!o_websocket_function){
-                console.error('could not find function with id '+n_id_websocket_function);
-                return;
-            }
-            if(o_websocket_function.s_name == o_websocket_function_update_o_object.s_name){
-                alert('asdfup');
-                let o_self = globalThis.o_self;
-                let a_n_u8_encrypted = a_n_u8_payload.slice(1);
-                const s_json_decrypted = await o_self.f_s_dectrypted_from_a_n_u8(new Uint8Array(a_n_u8_encrypted), o_self.o_object.s_id);
-                let o_data = JSON.parse(s_json_decrypted);
-                if(o_data?.o_object){
-                    o_self.o_object.a_o_path = o_data.o_object.a_o_path;
-                    o_self.o_object.n_ts_ms_last_downloaded_backup = o_data.o_object.n_ts_ms_last_downloaded_backup;
-                }else{
-                    console.error('could not find o_object in data from server');
-                }
+            let o_websocket_function = f_o_websocket_function_from_n_id(n_id_websocket_function,a_o_websocket_function);
+            console.log("Websocket message received!:", o_websocket_function);
+           
+            // if(o_websocket_function.s_name == o_websocket_function_update_o_object.s_name){
+            //     alert('Server received websocket message from client:');
+            //     let o_self = globalThis.o_self;
+            //     let a_n_u8_encrypted = a_n_u8_payload.slice(1);
+            //     const s_json_decrypted = await o_self.f_s_dectrypted_from_a_n_u8(new Uint8Array(a_n_u8_encrypted), o_self.o_object.s_id);
+            //     let o_data = JSON.parse(s_json_decrypted);
+            //     if(o_data?.o_object){
+            //         //update o_self.o_object from server data!
+            //         o_self.o_object.a_o_path = o_data.o_object.a_o_path;
+            //         o_self.o_object.n_ts_ms_last_downloaded_backup = o_data.o_object.n_ts_ms_last_downloaded_backup;
+            //         //visualize the paths
+            //         debugger
+            //         o_self.o_object.a_o_path.forEach(o_path_data=>{
+            //             let path = new window.paper.Path();
+            //             path.strokeColor = 'black';
+            //             console.log(path)
+            //             o_path_data.segments.forEach(o_segment_data=>{
+            //                 let point = new window.paper.Point(o_segment_data.point[0], o_segment_data.point[1]);
+            //                 path.add(point); 
+            //             });
+            //         });
+            //     }else{
+            //         console.error('could not find o_object in data from server');
+            //     }
             
-            }
-            if(o_websocket_function.s_name == o_websocket_function_payload_is_a_n_u8_encrypted_o_list.s_name){
+            // }
+            if(o_websocket_function.s_name == o_websocket_function_payload_is_a_n_u8_encrypted_o_object.s_name){
                 let a_n_u8_encrypted = a_n_u8_data;
 
                 if(a_n_u8_encrypted.length == 0){
@@ -200,8 +210,13 @@ const app = createApp({
                 }
                 const s_json_decrypted = await o_self.f_s_dectrypted_from_a_n_u8(new Uint8Array(a_n_u8_encrypted), s_id);
                 let o_data = JSON.parse(s_json_decrypted);
+                //update o_self.o_object from server data!
                 o_self.o_object = o_data;
-                
+                //visualize the paths using Paper.js importJSON
+                o_self.o_object.a_o_path.forEach(s_path_json => {
+                    window.paper.project.activeLayer.importJSON(s_path_json);
+                });
+
                 return o_data;
 
             }
@@ -222,22 +237,15 @@ const app = createApp({
         f_set_websocket_uuid: async function(s_uuid){
 
             let o_self = this;
-            let s_websocket_function = 'set_uuid_hashed';
             
             let a_n_u8_payload = new Uint8Array();
 
-            let o_websocket_function = a_o_websocket_function.find(o=>{
-                return o.s_name == s_websocket_function
-            });
-            if(!o_websocket_function){
-                alert("could not find function "+s_websocket_function);
-            };
             let s_uuid_hashed = await o_self.f_s_hashed_sha256(s_uuid);
             let o_text_encoder = new TextEncoder();
             // the payload always starts with the function id
             // after that the data (can be dynamic in this case it is the string of the hashed uuid) follows
             a_n_u8_payload = new Uint8Array([
-                o_websocket_function.n_id,
+                o_websocket_function_set_uuid_hashed.n_id,
                 ...o_text_encoder.encode(s_uuid_hashed)
                 
             ]);
@@ -474,13 +482,7 @@ const app = createApp({
                     o.s_uuid = crypto.randomUUID();
                 }
             }
-            let s_websocket_function = 'update_o_object';
-            let o_websocket_function = a_o_websocket_function.find(o=>{
-                return o.s_name == s_websocket_function
-            });
-            if(!o_websocket_function){
-                alert("could not find function "+s_websocket_function);
-            };
+
             let o_data = o_self.o_object;
 
             let a_n_u8_encrypted = await o_self.f_a_n_u8_encrypted_from_string(
@@ -509,10 +511,10 @@ const app = createApp({
             buffer.set(a_n_u8_encrypted, n_bytes_hash + a_n_u8_hashed_id.length);
         
             let a_n_u8_payload = new Uint8Array([
-                o_websocket_function.n_id,
+                o_websocket_function_update_o_object.n_id,
                 ...buffer
             ]);
-
+            console.log("Sending WebSocket payload:", a_n_u8_payload);
             o_ws.send(
                 a_n_u8_payload
             )
@@ -631,7 +633,8 @@ let f_init_sketch_js_stuff = function(){
         var difference = segmentCount - newSegmentCount;
         var percentage = 100 - Math.round(newSegmentCount / segmentCount * 100);
         textItem.content = difference + ' of the ' + segmentCount + ' segments were removed. Saving ' + percentage + '%';
-        o_self.o_object.a_o_path.push(path);
+        // Store path as JSON string for proper serialization
+        o_self.o_object.a_o_path.push(path.exportJSON());
         o_self.f_update_o_object();
     }
    	// // Create a Paper.js Path to draw a line into it:
