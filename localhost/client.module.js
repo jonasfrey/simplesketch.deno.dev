@@ -159,9 +159,7 @@ const app = createApp({
             await o_self.f_set_websocket_uuid(o_self.o_object.s_id);
 
             await o_self.f_update_o_object();
-            debugger
         }
-        debugger
         o_canvas.width = o_self.o_object.n_scl_x_px;
         o_canvas.height = o_self.o_object.n_scl_y_px;
         
@@ -181,7 +179,7 @@ const app = createApp({
                 return;
             }
             if(o_websocket_function.s_name == o_websocket_function_update_o_object.s_name){
-      
+                alert('asdfup');
                 let o_self = globalThis.o_self;
                 let a_n_u8_encrypted = a_n_u8_payload.slice(1);
                 const s_json_decrypted = await o_self.f_s_dectrypted_from_a_n_u8(new Uint8Array(a_n_u8_encrypted), o_self.o_object.s_id);
@@ -451,7 +449,6 @@ const app = createApp({
             return buffer
         },
         f_read_o_object: async function(){
-            debugger
             let o_self = this; 
             let s_uuid_hashed = await o_self.f_s_hashed_sha256(o_self.o_object.s_id);
             let o_websocket_function = a_o_websocket_function.find(o=>{
@@ -634,6 +631,8 @@ let f_init_sketch_js_stuff = function(){
         var difference = segmentCount - newSegmentCount;
         var percentage = 100 - Math.round(newSegmentCount / segmentCount * 100);
         textItem.content = difference + ' of the ' + segmentCount + ' segments were removed. Saving ' + percentage + '%';
+        o_self.o_object.a_o_path.push(path);
+        o_self.f_update_o_object();
     }
    	// // Create a Paper.js Path to draw a line into it:
 	// var path = new Path();
