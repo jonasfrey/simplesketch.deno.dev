@@ -107,6 +107,7 @@ f_add_css(
     `
 );
 
+let n_mouse_button_left = 1;
 
 let o_div = document;
 let o_blob_stl = null;
@@ -137,6 +138,13 @@ const app = createApp({
     // // this.accessRenderedElement()
     // },
     async mounted() {
+        if(window.location.protocol != 'https:') {
+            let s_protocol = 'https';
+            let n_port = 8443; 
+            let s_new_url = `${s_protocol}://${window.location.hostname}:${n_port}${window.location.pathname}${window.location.hash}`;
+            window.location.href = s_new_url;
+            return;
+        }
             let o_self = this;
             globalThis.o_self = this;
 
@@ -149,6 +157,18 @@ const app = createApp({
             }
 
         globalThis.o_canvas = document.querySelector('canvas');
+        //disable context menu 
+        globalThis.addEventListener("contextmenu", function(event){
+        //document.body.addEventListener("contextmenu", function(event){
+            console.log ('Right click');
+            
+            //event.stopImmediatePropagation();
+            event.stopPropagation();
+            event.preventDefault();
+            return false;
+            //return true;
+        });
+
 
         f_init_sketch_js_stuff();
 
@@ -200,7 +220,6 @@ const app = createApp({
             //     }else{
             //         console.error('could not find o_object in data from server');
             //     }
-            
             // }
             if(o_websocket_function.s_name == o_websocket_function_payload_is_a_n_u8_encrypted_o_object.s_name){
                 let a_n_u8_encrypted = a_n_u8_data;
@@ -213,8 +232,8 @@ const app = createApp({
                 //update o_self.o_object from server data!
                 o_self.o_object = o_data;
                 //visualize the paths using Paper.js importJSON
-                o_self.o_object.a_o_path.forEach(s_path_json => {
-                    window.paper.project.activeLayer.importJSON(s_path_json);
+                o_self.o_object.a_o_path.forEach(o_path => {
+                    window.paper.project.activeLayer.importJSON(JSON.stringify(o_path));
                 });
 
                 return o_data;
@@ -470,21 +489,21 @@ const app = createApp({
             await o_self.f_backup_list();
         },
         f_update_o_object : async function(){
-
+            
             let o_self = this;
             o_self.b_writing = true;
             // update data structure updates that changes with different git versions
-            for(let o of o_self.o_object.a_o_path){
-                if(!o?.b_done_final){
-                    o.b_done_final = false;
-                }
-                if(!o?.s_uuid){
-                    o.s_uuid = crypto.randomUUID();
-                }
-            }
-
+            // for(let o of o_self.o_object){}
+            
+            // add all path objects from paper.js to the object
+            o_self.o_object.a_o_path = [];
+            window.paper.project.activeLayer.children.forEach(o_path=>{
+                o_self.o_object.a_o_path.push(
+                    JSON.parse(o_path.exportJSON())
+                );
+            });
+            
             let o_data = o_self.o_object;
-
             let a_n_u8_encrypted = await o_self.f_a_n_u8_encrypted_from_string(
                 o_data, 
                 o_self.o_object.s_id 
@@ -537,6 +556,11 @@ const app = createApp({
 
     },
     watch: {
+        o_object:(o_new)=>{
+            let o_self = this;
+            o_canvas.width = o_new.n_scl_x_px
+            o_canvas.height = o_new.n_scl_y_px
+        }
     },
   data() {
     return {
@@ -584,7 +608,8 @@ let f_init_sketch_js_stuff = function(){
     var textItem = new PointText({
         content: 'Click and drag to draw a line.',
         point: new Point(20, 30),
-        fillColor: 'black',
+        fillColor: '#dee',
+        strokeWidth: 10,
     });
     
     // Use Paper.js's Tool system for mouse events
@@ -594,29 +619,62 @@ let f_init_sketch_js_stuff = function(){
     console.log('Paper.js tool created:', tool);
 
     tool.onMouseDown = function(event) {
-        console.log('mousedown event:', event);
-        // If we produced a path before, deselect it:
-        if (path) {
-            path.selected = false;
+        
+        if(event.event.buttons === n_mouse_button_left){
+
+            console.log('mousedown event:', event);
+            // If we produced a path before, deselect it:
+            if (path) {
+                path.selected = false;
+            }
+    
+            // Create a new path and set its stroke color to black:
+            path = new Path({
+                segments: [event.point],
+                // Select the path, so we can see its segment points:
+                fullySelected: true,
+                strokeColor: '#dee',
+                strokeWidth: 2,
+            });
         }
 
-        // Create a new path and set its stroke color to black:
-        path = new Path({
-            segments: [event.point],
-            strokeColor: 'black',
-            // Select the path, so we can see its segment points:
-            fullySelected: true
-        });
+
+
     }
 
     // While the user drags the mouse, points are added to the path
     // at the position of the mouse:
     tool.onMouseDrag = function(event) {
-        path.add(event.point);
+        // Only add points when left mouse button is pressed
+        if (event.event.buttons === n_mouse_button_left) {
+            path.add(event.point);
 
-        // Update the content of the text item to show how many
-        // segments it has:
-        textItem.content = 'Segment count: ' + path.segments.length;
+            // Update the content of the text item to show how many
+            // segments it has:
+            textItem.content = 'Segment count: ' + path.segments.length;
+        }
+
+        // check if right mouse is down
+        if (event.event.buttons === 2) {
+            let a_o_path = window.paper.project.activeLayer.children.filter(o=>{
+                return o?.segments?.length > 1
+            });
+            //detect if mouse is hovering over a path segment
+            let a_o_hit_result = a_o_path.filter(o=>{
+                o.hitTest(event.point)
+            });
+            for(let o_path of a_o_path){
+                let b_hit = o_path.hitTest(event.point);
+                console.log(b_hit)
+                if(b_hit){
+                    o_path.remove();
+                    // Store path as JSON string for proper serialization
+                    o_self.f_update_o_object();
+                }
+
+            } 
+
+        }
     }
 
     // When the mouse is released, we simplify the path:
@@ -634,7 +692,11 @@ let f_init_sketch_js_stuff = function(){
         var percentage = 100 - Math.round(newSegmentCount / segmentCount * 100);
         textItem.content = difference + ' of the ' + segmentCount + ' segments were removed. Saving ' + percentage + '%';
         // Store path as JSON string for proper serialization
-        o_self.o_object.a_o_path.push(path.exportJSON());
+        
+        window.setTimeout(()=>{
+            // unselect the path 
+            path.selected = false;
+        })
         o_self.f_update_o_object();
     }
    	// // Create a Paper.js Path to draw a line into it:
