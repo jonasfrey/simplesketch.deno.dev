@@ -175,6 +175,7 @@ const app = createApp({
         o_canvas.width = window.innerWidth;
         o_canvas.height = window.innerHeight;
 
+        
         f_init_sketch_js_stuff();
 
         if(b_new_object){
@@ -257,17 +258,24 @@ const app = createApp({
 
         // Handle window resize - update canvas and view transform
         window.addEventListener('resize', () => {
-            o_canvas.width = window.innerWidth;
-            o_canvas.height = window.innerHeight;
-            window.paper.view.viewSize = new window.paper.Size(window.innerWidth, window.innerHeight);
-            o_self.f_apply_view_transform();
+            this.f_update_canvas_size();
         });
+        window.setTimeout(()=>{
+            this.f_update_canvas_size();
+        }, 1000);
 
     },
     beforeUnmount() {
         window.removeEventListener('pointerup', this.f_pointerup);
     },
     methods: {
+        f_update_canvas_size: function(){
+            let o_self = this;
+                        o_canvas.width = window.innerWidth;
+            o_canvas.height = window.innerHeight;
+            window.paper.view.viewSize = new window.paper.Size(window.innerWidth, window.innerHeight);
+            o_self.f_apply_view_transform();
+        },
         f_apply_view_transform: function(){
             // Scale and position the Paper.js view to fit content from different screen sizes
             let o_self = this;
