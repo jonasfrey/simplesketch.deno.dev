@@ -598,26 +598,10 @@ const app = createApp({
 
 let f_init_sketch_js_stuff = function(){
 
-    // Helper to detect primary input (left mouse, touch, or pen without button)
-    function f_b_is_primary_input(event) {
-        const e = event.event;
-        // Touch event (no buttons property, or pointerType is touch)
-        if (e.pointerType === 'touch') return true;
-        if (e.type?.startsWith('touch')) return true;
-        // Pen/stylus without button pressed (buttons === 1 or pressure without button)
-        if (e.pointerType === 'pen') return e.buttons === 1 || e.buttons === undefined || e.buttons === 0;
-        // Mouse left button
-        return e.buttons === n_mouse_button_left;
-    }
-
-    // Helper to detect secondary input (right mouse or S Pen button)
-    function f_b_is_secondary_input(event) {
-        const e = event.event;
-        // S Pen with button pressed
-        if (e.pointerType === 'pen' && e.buttons === 2) return true;
-        // Mouse right button
-        return e.buttons === 2;
-    }
+    // Double-click detection for eraser mode
+    var n_ts_last_mousedown = 0;
+    var b_eraser_mode = false;
+    var n_ms_double_click_threshold = 300; // ms between clicks to count as double-click
 
     // sketchjs stuff
     // Access Paper.js from the global window/paper object
@@ -628,12 +612,12 @@ let f_init_sketch_js_stuff = function(){
 
     var path = new Path();
     var textItem = new PointText({
-        content: 'Click and drag to draw a line.',
+        content: 'Click and drag to draw. Double-click and drag to erase.',
         point: new Point(20, 30),
         fillColor: '#dee',
         strokeWidth: 10,
     });
-    
+
     // Use Paper.js's Tool system for mouse events
     // Paper.js Tool provides event.point automatically
     var tool = new window.paper.Tool();
@@ -641,8 +625,16 @@ let f_init_sketch_js_stuff = function(){
     console.log('Paper.js tool created:', tool);
 
     tool.onMouseDown = function(event) {
+        var n_ts_now = Date.now();
+        var n_ms_since_last = n_ts_now - n_ts_last_mousedown;
 
-        if(f_b_is_primary_input(event)){
+        // Check for double-click (two clicks within threshold)
+        if (n_ms_since_last < n_ms_double_click_threshold) {
+            b_eraser_mode = true;
+            textItem.content = 'Eraser mode - drag to erase paths';
+            console.log('Eraser mode activated');
+        } else {
+            b_eraser_mode = false;
 
             console.log('mousedown event:', event);
             // If we produced a path before, deselect it:
@@ -659,44 +651,46 @@ let f_init_sketch_js_stuff = function(){
                 strokeWidth: 2,
             });
         }
+
+        n_ts_last_mousedown = n_ts_now;
     }
 
     // While the user drags the mouse, points are added to the path
     // at the position of the mouse:
     tool.onMouseDrag = function(event) {
-        // Only add points for primary input (left mouse, touch, pen)
-        if (f_b_is_primary_input(event)) {
+        if (b_eraser_mode) {
+            // Eraser mode: delete paths that are hit
+            let a_o_path = window.paper.project.activeLayer.children.filter(o => {
+                return o?.segments?.length > 1;
+            });
+
+            for (let o_path of a_o_path) {
+                let b_hit = o_path.hitTest(event.point);
+                if (b_hit) {
+                    o_path.remove();
+                    o_self.f_update_o_object();
+                }
+            }
+        } else {
+            // Drawing mode: add points to the path
             path.add(event.point);
 
             // Update the content of the text item to show how many
             // segments it has:
             textItem.content = 'Segment count: ' + path.segments.length;
         }
-
-        // Check for secondary input (right mouse or S Pen button)
-        if (f_b_is_secondary_input(event)) {
-            let a_o_path = window.paper.project.activeLayer.children.filter(o=>{
-                return o?.segments?.length > 1
-            });
-            //detect if mouse is hovering over a path segment
-
-            for(let o_path of a_o_path){
-                let b_hit = o_path.hitTest(event.point);
-                console.log(b_hit)
-                if(b_hit){
-                    o_path.remove();
-                    // Store path as JSON string for proper serialization
-                    o_self.f_update_o_object();
-                }
-
-            } 
-
-        }
     }
 
     // When the mouse is released, we simplify the path:
     tool.onMouseUp = function(event) {
-        // Only process if we have a path with segments (from primary input drawing)
+        if (b_eraser_mode) {
+            // Reset eraser mode and update text
+            b_eraser_mode = false;
+            textItem.content = 'Click and drag to draw. Double-click and drag to erase.';
+            return;
+        }
+
+        // Only process if we have a path with segments (from drawing)
         if (!path || !path.segments || path.segments.length < 2) {
             return;
         }
