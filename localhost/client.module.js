@@ -86,6 +86,7 @@ f_add_css(
         width: 100%;
         height: 100%;
         z-index: 1;
+        touch-action: none; /* Prevent default touch behaviors for drawing */
     }
     #app {
         position: fixed;
@@ -597,6 +598,27 @@ const app = createApp({
 
 let f_init_sketch_js_stuff = function(){
 
+    // Helper to detect primary input (left mouse, touch, or pen without button)
+    function f_b_is_primary_input(event) {
+        const e = event.event;
+        // Touch event (no buttons property, or pointerType is touch)
+        if (e.pointerType === 'touch') return true;
+        if (e.type?.startsWith('touch')) return true;
+        // Pen/stylus without button pressed (buttons === 1 or pressure without button)
+        if (e.pointerType === 'pen') return e.buttons === 1 || e.buttons === undefined || e.buttons === 0;
+        // Mouse left button
+        return e.buttons === n_mouse_button_left;
+    }
+
+    // Helper to detect secondary input (right mouse or S Pen button)
+    function f_b_is_secondary_input(event) {
+        const e = event.event;
+        // S Pen with button pressed
+        if (e.pointerType === 'pen' && e.buttons === 2) return true;
+        // Mouse right button
+        return e.buttons === 2;
+    }
+
     // sketchjs stuff
     // Access Paper.js from the global window/paper object
     const { Base, Path, Point, PointText } = window.paper;
@@ -619,15 +641,15 @@ let f_init_sketch_js_stuff = function(){
     console.log('Paper.js tool created:', tool);
 
     tool.onMouseDown = function(event) {
-        
-        if(event.event.buttons === n_mouse_button_left){
+
+        if(f_b_is_primary_input(event)){
 
             console.log('mousedown event:', event);
             // If we produced a path before, deselect it:
             if (path) {
                 path.selected = false;
             }
-    
+
             // Create a new path and set its stroke color to black:
             path = new Path({
                 segments: [event.point],
@@ -637,16 +659,13 @@ let f_init_sketch_js_stuff = function(){
                 strokeWidth: 2,
             });
         }
-
-
-
     }
 
     // While the user drags the mouse, points are added to the path
     // at the position of the mouse:
     tool.onMouseDrag = function(event) {
-        // Only add points when left mouse button is pressed
-        if (event.event.buttons === n_mouse_button_left) {
+        // Only add points for primary input (left mouse, touch, pen)
+        if (f_b_is_primary_input(event)) {
             path.add(event.point);
 
             // Update the content of the text item to show how many
@@ -654,15 +673,13 @@ let f_init_sketch_js_stuff = function(){
             textItem.content = 'Segment count: ' + path.segments.length;
         }
 
-        // check if right mouse is down
-        if (event.event.buttons === 2) {
+        // Check for secondary input (right mouse or S Pen button)
+        if (f_b_is_secondary_input(event)) {
             let a_o_path = window.paper.project.activeLayer.children.filter(o=>{
                 return o?.segments?.length > 1
             });
             //detect if mouse is hovering over a path segment
-            let a_o_hit_result = a_o_path.filter(o=>{
-                o.hitTest(event.point)
-            });
+
             for(let o_path of a_o_path){
                 let b_hit = o_path.hitTest(event.point);
                 console.log(b_hit)
@@ -679,6 +696,11 @@ let f_init_sketch_js_stuff = function(){
 
     // When the mouse is released, we simplify the path:
     tool.onMouseUp = function(event) {
+        // Only process if we have a path with segments (from primary input drawing)
+        if (!path || !path.segments || path.segments.length < 2) {
+            return;
+        }
+
         var segmentCount = path.segments.length;
 
         // When the mouse is released, simplify it:
@@ -692,9 +714,9 @@ let f_init_sketch_js_stuff = function(){
         var percentage = 100 - Math.round(newSegmentCount / segmentCount * 100);
         textItem.content = difference + ' of the ' + segmentCount + ' segments were removed. Saving ' + percentage + '%';
         // Store path as JSON string for proper serialization
-        
+
         window.setTimeout(()=>{
-            // unselect the path 
+            // unselect the path
             path.selected = false;
         })
         o_self.f_update_o_object();
