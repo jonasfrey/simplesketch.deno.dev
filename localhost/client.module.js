@@ -171,6 +171,10 @@ const app = createApp({
         });
 
 
+        // Always set canvas to current device size for correct mouse coordinates
+        o_canvas.width = window.innerWidth;
+        o_canvas.height = window.innerHeight;
+
         f_init_sketch_js_stuff();
 
         if(b_new_object){
@@ -182,8 +186,6 @@ const app = createApp({
 
             await o_self.f_update_o_object();
         }
-        o_canvas.width = o_self.o_object.n_scl_x_px;
-        o_canvas.height = o_self.o_object.n_scl_y_px;
         
 
         // triggered when a message is received from the server
@@ -232,6 +234,10 @@ const app = createApp({
                 let o_data = JSON.parse(s_json_decrypted);
                 //update o_self.o_object from server data!
                 o_self.o_object = o_data;
+
+                // Apply view transformation if document size differs from current screen
+                o_self.f_apply_view_transform();
+
                 //visualize the paths using Paper.js importJSON
                 o_self.o_object.a_o_path.forEach(o_path => {
                     window.paper.project.activeLayer.importJSON(JSON.stringify(o_path));
@@ -248,12 +254,42 @@ const app = createApp({
 
 
         document.addEventListener('pointerup', this.f_pointerup);
-          
+
+        // Handle window resize - update canvas and view transform
+        window.addEventListener('resize', () => {
+            o_canvas.width = window.innerWidth;
+            o_canvas.height = window.innerHeight;
+            window.paper.view.viewSize = new window.paper.Size(window.innerWidth, window.innerHeight);
+            o_self.f_apply_view_transform();
+        });
+
     },
     beforeUnmount() {
         window.removeEventListener('pointerup', this.f_pointerup);
     },
     methods: {
+        f_apply_view_transform: function(){
+            // Scale and position the Paper.js view to fit content from different screen sizes
+            let o_self = this;
+            let n_doc_width = o_self.o_object.n_scl_x_px || window.innerWidth;
+            let n_doc_height = o_self.o_object.n_scl_y_px || window.innerHeight;
+            let n_screen_width = window.innerWidth;
+            let n_screen_height = window.innerHeight;
+
+            // Calculate scale to fit the document in current screen (fit inside)
+            let n_scale_x = n_screen_width / n_doc_width;
+            let n_scale_y = n_screen_height / n_doc_height;
+            let n_scale = Math.min(n_scale_x, n_scale_y);
+
+            // Apply zoom
+            window.paper.view.zoom = n_scale;
+
+            // Center the view on the document center
+            let o_doc_center = new window.paper.Point(n_doc_width / 2, n_doc_height / 2);
+            window.paper.view.center = o_doc_center;
+
+            console.log(`View transform: doc=${n_doc_width}x${n_doc_height}, screen=${n_screen_width}x${n_screen_height}, scale=${n_scale}`);
+        },
         f_set_websocket_uuid: async function(s_uuid){
 
             let o_self = this;
