@@ -251,9 +251,6 @@ const app = createApp({
         });
 
 
-
-
-
         document.addEventListener('pointerup', this.f_pointerup);
 
         // Handle window resize - update canvas and view transform
@@ -646,6 +643,8 @@ let f_init_sketch_js_stuff = function(){
     var n_ts_last_mousedown = 0;
     var b_eraser_mode = false;
     var n_ms_double_click_threshold = 300; // ms between clicks to count as double-click
+    var n_eraser_tolerance = 20;
+    var o_eraser_circle = null; // Visual indicator for eraser
 
     // sketchjs stuff
     // Access Paper.js from the global window/paper object
@@ -677,6 +676,14 @@ let f_init_sketch_js_stuff = function(){
             b_eraser_mode = true;
             textItem.content = 'Eraser mode - drag to erase paths';
             console.log('Eraser mode activated');
+            // Create eraser circle indicator
+            o_eraser_circle = new window.paper.Path.Circle({
+                center: event.point,
+                radius: n_eraser_tolerance,
+                strokeColor: '#f66',
+                strokeWidth: 1,
+                fillColor: null
+            });
         } else {
             b_eraser_mode = false;
 
@@ -703,13 +710,23 @@ let f_init_sketch_js_stuff = function(){
     // at the position of the mouse:
     tool.onMouseDrag = function(event) {
         if (b_eraser_mode) {
+            // Update eraser circle position
+            if (o_eraser_circle) {
+                o_eraser_circle.position = event.point;
+            }
             // Eraser mode: delete paths that are hit
             let a_o_path = window.paper.project.activeLayer.children.filter(o => {
-                return o?.segments?.length > 1;
+                return o?.segments?.length > 1 && o !== o_eraser_circle;
             });
 
             for (let o_path of a_o_path) {
-                let b_hit = o_path.hitTest(event.point);
+                let b_hit = o_path.hitTest(
+                    event.point,
+                    {
+                        stroke: true,
+                        tolerance: n_eraser_tolerance
+                    }
+                );
                 if (b_hit) {
                     o_path.remove();
                     o_self.f_update_o_object();
@@ -728,6 +745,11 @@ let f_init_sketch_js_stuff = function(){
     // When the mouse is released, we simplify the path:
     tool.onMouseUp = function(event) {
         if (b_eraser_mode) {
+            // Remove eraser circle indicator
+            if (o_eraser_circle) {
+                o_eraser_circle.remove();
+                o_eraser_circle = null;
+            }
             // Reset eraser mode and update text
             b_eraser_mode = false;
             textItem.content = 'Click and drag to draw. Double-click and drag to erase.';
