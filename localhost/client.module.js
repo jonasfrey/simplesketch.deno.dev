@@ -642,7 +642,7 @@ let f_init_sketch_js_stuff = function(){
     // Double-click detection for eraser mode
     var n_ts_last_mousedown = 0;
     var b_eraser_mode = false;
-    var n_ms_double_click_threshold = 300; // ms between clicks to count as double-click
+    var n_ms_double_click_threshold = 200; // ms between clicks to count as double-click
     var n_eraser_tolerance = 20;
     var o_eraser_circle = null; // Visual indicator for eraser
 
@@ -670,7 +670,7 @@ let f_init_sketch_js_stuff = function(){
     tool.onMouseDown = function(event) {
         var n_ts_now = Date.now();
         var n_ms_since_last = n_ts_now - n_ts_last_mousedown;
-
+        // console.log(`delta is : ${n_ms_since_last} ms`);
         // Check for double-click (two clicks within threshold)
         if (n_ms_since_last < n_ms_double_click_threshold) {
             b_eraser_mode = true;
