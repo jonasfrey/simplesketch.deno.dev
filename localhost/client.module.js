@@ -668,12 +668,19 @@ const app = createApp({
 
 let f_init_sketch_js_stuff = function(){
 
-    // Double-click detection for eraser mode
+    // Eraser mode detection: double-tap + hold in place
     var n_ts_last_mousedown = 0;
     var b_eraser_mode = false;
-    var n_ms_double_click_threshold = 200; // ms between clicks to count as double-click
+    var b_waiting_for_eraser_confirm = false;  // waiting for hold confirmation
+    var o_point_eraser_start = null;           // where the double-tap started
+    var n_id_timeout_eraser = null;            // timeout ID for hold detection
+
+    // Thresholds
+    var n_ms_double_tap_threshold = 300;       // ms between taps to count as double-tap
+    var n_ms_hold_to_confirm = 150;            // ms to hold after double-tap
+    var n_px_max_movement = 50;                // max px movement during hold
     var n_eraser_tolerance = 20;
-    var o_eraser_circle = null; // Visual indicator for eraser
+    var o_eraser_circle = null;                // Visual indicator for eraser
 
     // sketchjs stuff
     // Access Paper.js from the global window/paper object
@@ -684,14 +691,51 @@ let f_init_sketch_js_stuff = function(){
 
     var path = new Path();
     var textItem = new PointText({
-        content: 'Click and drag to draw. Double-click and drag to erase.',
+        content: 'Click and drag to draw. Double-tap and hold to erase.',
         point: new Point(20, 30),
         fillColor: '#dee',
         strokeWidth: 10,
     });
 
+    // Helper to activate eraser mode
+    function f_activate_eraser(o_point) {
+        b_eraser_mode = true;
+        b_waiting_for_eraser_confirm = false;
+        textItem.content = 'Eraser mode - drag to erase paths';
+        console.log('Eraser mode activated');
+
+        // Create eraser circle indicator
+        o_eraser_circle = new window.paper.Path.Circle({
+            center: o_point,
+            radius: n_eraser_tolerance,
+            strokeColor: '#f66',
+            strokeWidth: 2,
+            fillColor: 'rgba(255, 100, 100, 0.2)'
+        });
+    }
+
+    // Helper to cancel eraser confirmation and start drawing
+    function f_cancel_eraser_confirm_and_draw(o_point) {
+        if (n_id_timeout_eraser) {
+            clearTimeout(n_id_timeout_eraser);
+            n_id_timeout_eraser = null;
+        }
+        b_waiting_for_eraser_confirm = false;
+        o_point_eraser_start = null;
+
+        // Start drawing from the original point
+        if (path) {
+            path.selected = false;
+        }
+        path = new Path({
+            segments: [o_point],
+            fullySelected: true,
+            strokeColor: '#dee',
+            strokeWidth: 2,
+        });
+    }
+
     // Use Paper.js's Tool system for mouse events
-    // Paper.js Tool provides event.point automatically
     var tool = new window.paper.Tool();
 
     console.log('Paper.js tool created:', tool);
@@ -699,33 +743,35 @@ let f_init_sketch_js_stuff = function(){
     tool.onMouseDown = function(event) {
         var n_ts_now = Date.now();
         var n_ms_since_last = n_ts_now - n_ts_last_mousedown;
-        // console.log(`delta is : ${n_ms_since_last} ms`);
-        // Check for double-click (two clicks within threshold)
-        if (n_ms_since_last < n_ms_double_click_threshold) {
-            b_eraser_mode = true;
-            textItem.content = 'Eraser mode - drag to erase paths';
-            console.log('Eraser mode activated');
-            // Create eraser circle indicator
-            o_eraser_circle = new window.paper.Path.Circle({
-                center: event.point,
-                radius: n_eraser_tolerance,
-                strokeColor: '#f66',
-                strokeWidth: 1,
-                fillColor: null
-            });
-        } else {
-            b_eraser_mode = false;
 
-            console.log('mousedown event:', event);
-            // If we produced a path before, deselect it:
+        console.log(`delta: ${n_ms_since_last}ms, threshold: ${n_ms_double_tap_threshold}ms`);
+
+        // Check for double-tap (two taps within threshold)
+        if (n_ms_since_last < n_ms_double_tap_threshold) {
+            // Potential eraser activation - wait for hold confirmation
+            b_waiting_for_eraser_confirm = true;
+            o_point_eraser_start = event.point.clone();
+
+            textItem.content = 'Hold to activate eraser...';
+
+            // Start timer - if still holding after delay, activate eraser
+            n_id_timeout_eraser = setTimeout(() => {
+                if (b_waiting_for_eraser_confirm) {
+                    f_activate_eraser(o_point_eraser_start);
+                }
+            }, n_ms_hold_to_confirm);
+
+        } else {
+            // Normal drawing - start new path
+            b_eraser_mode = false;
+            b_waiting_for_eraser_confirm = false;
+
             if (path) {
                 path.selected = false;
             }
 
-            // Create a new path and set its stroke color to black:
             path = new Path({
                 segments: [event.point],
-                // Select the path, so we can see its segment points:
                 fullySelected: true,
                 strokeColor: '#dee',
                 strokeWidth: 2,
@@ -736,8 +782,21 @@ let f_init_sketch_js_stuff = function(){
     }
 
     // While the user drags the mouse, points are added to the path
-    // at the position of the mouse:
     tool.onMouseDrag = function(event) {
+        if (b_waiting_for_eraser_confirm) {
+            // Check if moved too far from start point
+            var n_distance = event.point.getDistance(o_point_eraser_start);
+            if (n_distance > n_px_max_movement) {
+                // Moved too far - cancel eraser, start drawing instead
+                console.log(`Moved ${n_distance}px > ${n_px_max_movement}px - canceling eraser, drawing instead`);
+                f_cancel_eraser_confirm_and_draw(o_point_eraser_start);
+                // Add current point to the path
+                path.add(event.point);
+                textItem.content = 'Segment count: ' + path.segments.length;
+            }
+            return;
+        }
+
         if (b_eraser_mode) {
             // Update eraser circle position
             if (o_eraser_circle) {
@@ -764,15 +823,26 @@ let f_init_sketch_js_stuff = function(){
         } else {
             // Drawing mode: add points to the path
             path.add(event.point);
-
-            // Update the content of the text item to show how many
-            // segments it has:
             textItem.content = 'Segment count: ' + path.segments.length;
         }
     }
 
     // When the mouse is released, we simplify the path:
     tool.onMouseUp = function(event) {
+        // Clean up any pending eraser confirmation
+        if (n_id_timeout_eraser) {
+            clearTimeout(n_id_timeout_eraser);
+            n_id_timeout_eraser = null;
+        }
+
+        if (b_waiting_for_eraser_confirm) {
+            // Released before hold completed - do nothing (was just a double-tap)
+            b_waiting_for_eraser_confirm = false;
+            o_point_eraser_start = null;
+            textItem.content = 'Click and drag to draw. Double-tap and hold to erase.';
+            return;
+        }
+
         if (b_eraser_mode) {
             // Remove eraser circle indicator
             if (o_eraser_circle) {
@@ -781,7 +851,7 @@ let f_init_sketch_js_stuff = function(){
             }
             // Reset eraser mode and update text
             b_eraser_mode = false;
-            textItem.content = 'Click and drag to draw. Double-click and drag to erase.';
+            textItem.content = 'Click and drag to draw. Double-tap and hold to erase.';
             return;
         }
 
@@ -802,10 +872,8 @@ let f_init_sketch_js_stuff = function(){
         var difference = segmentCount - newSegmentCount;
         var percentage = 100 - Math.round(newSegmentCount / segmentCount * 100);
         textItem.content = difference + ' of the ' + segmentCount + ' segments were removed. Saving ' + percentage + '%';
-        // Store path as JSON string for proper serialization
 
         window.setTimeout(()=>{
-            // unselect the path
             path.selected = false;
         })
         o_self.f_update_o_object();
