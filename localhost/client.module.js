@@ -150,9 +150,10 @@ const app = createApp({
             globalThis.o_self = this;
 
             let b_new_object = true;
-            let s_id = window.location.hash.replace('#', '');
+            // Extract UUID from pathname (e.g., /abc-123-uuid -> abc-123-uuid)
+            let s_id = window.location.pathname.slice(1); // remove leading /
 
-            if(s_id != ``){
+            if(s_id != `` && s_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)){
                 o_self.f_set_websocket_uuid(s_id);
                 b_new_object = false;
             }
@@ -182,7 +183,8 @@ const app = createApp({
             o_self.o_object.s_id = crypto.randomUUID();
             o_self.o_object.n_scl_x_px = window.innerWidth;
             o_self.o_object.n_scl_y_px = window.innerHeight;
-            window.location.hash = o_self.o_object.s_id;
+            // Use pathname instead of hash for UUID
+            window.history.pushState({}, '', '/' + o_self.o_object.s_id);
             await o_self.f_set_websocket_uuid(o_self.o_object.s_id);
 
             await o_self.f_update_o_object();
@@ -556,7 +558,7 @@ const app = createApp({
                 bgRect.insertBelow(window.paper.project.activeLayer.firstChild);
 
                 let raster = window.paper.project.activeLayer.rasterize({
-                    resolution: 4,
+                    resolution: 16,
                     insert: false
                 });
                 let croppedRaster = raster.getSubRaster(bounds);

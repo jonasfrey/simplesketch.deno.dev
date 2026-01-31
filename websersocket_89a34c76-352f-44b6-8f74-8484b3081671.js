@@ -225,16 +225,15 @@ let f_handler = async function(o_request){
     // normal http request handling here
     let o_url = new URL(o_request.url);
 
-
-    // Check if this is a UUID path and an image request
+    // Check if pathname is a UUID
+    let s_uuid_match = o_url.pathname.match(/^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
     let s_fetch_dest = o_request.headers.get('Sec-Fetch-Dest');
     let s_accept = o_request.headers.get('Accept') || '';
     let b_is_image_request = s_fetch_dest === 'image' || (s_accept.includes('image/') && !s_accept.includes('text/html'));
 
-    console.log('sec-fetch-dest: '+s_fetch_dest);
-    if (b_is_image_request) {
-        console.log(o_url.hash)
-        let s_uuid = o_url.hash;
+    // If UUID path and image request -> serve the image
+    if (s_uuid_match && b_is_image_request) {
+        let s_uuid = s_uuid_match[1];
         try {
             let s_id_hashed = await f_s_hashed_sha256(s_uuid);
             let a_n_u8_encrypted = await f_a_n_u8_o_object(s_id_hashed);
@@ -269,7 +268,9 @@ let f_handler = async function(o_request){
         }
     }
 
-    if(o_url.pathname == '/'){
+    // If UUID path and NOT image request -> serve HTML page (client will load the sketch)
+    // Or if root path -> serve HTML page
+    if(o_url.pathname == '/' || s_uuid_match){
         return new Response(
             await Deno.readTextFile(
                 `${s_path_abs_folder_current}/localhost/client.html`
