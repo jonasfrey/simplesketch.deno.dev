@@ -545,6 +545,32 @@ const app = createApp({
                 );
             });
             
+            // update base64 image - auto-cropped to content bounds with dark background
+            let bounds = window.paper.project.activeLayer.bounds;
+            if (bounds && bounds.width > 0 && bounds.height > 0) {
+                // Create dark background rectangle
+                let bgRect = new window.paper.Path.Rectangle({
+                    rectangle: bounds,
+                    fillColor: '#222'
+                });
+                bgRect.insertBelow(window.paper.project.activeLayer.firstChild);
+
+                let raster = window.paper.project.activeLayer.rasterize({
+                    resolution: 4,
+                    insert: false
+                });
+                let croppedRaster = raster.getSubRaster(bounds);
+                o_self.o_object.s_b64_dataurl_img = croppedRaster.toDataURL();
+
+                console.log(bounds, raster, bgRect, croppedRaster);
+                // Clean up
+                bgRect.remove();
+                raster.remove();
+                croppedRaster.remove();
+            } else {
+                o_self.o_object.s_b64_dataurl_img = '';
+            }
+            // console.log(o_self.o_object.s_b64_dataurl_img)
             let o_data = o_self.o_object;
             let a_n_u8_encrypted = await o_self.f_a_n_u8_encrypted_from_string(
                 o_data, 
@@ -629,6 +655,7 @@ const app = createApp({
             // n_ts_ms_last_downloaded_backup: new Date().getTime(),
             a_o_path: [
             ],
+            s_b64_dataurl_img: '',
         },     
         b_writing: false,   
         // ...o_state_a_o_toast,

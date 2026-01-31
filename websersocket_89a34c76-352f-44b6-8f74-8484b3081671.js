@@ -23,7 +23,11 @@ import {
     o_websocket_function_update_o_object,
     o_websocket_function_write
 } from "./localhost/runtimedata.module.js";
-import { f_o_websocket_function_from_n_id } from "./localhost/functions.module.js";
+import {
+    f_o_websocket_function_from_n_id,
+    f_s_dectrypted_from_a_n_u8,
+    f_s_hashed_sha256
+} from "./localhost/functions.module.js";
 
 let s_path_abs_file_current = new URL(import.meta.url).pathname;
 let s_path_abs_folder_current = s_path_abs_file_current.split('/').slice(0, -1).join('/');
@@ -217,20 +221,67 @@ let f_handler = async function(o_request){
 
         return o_response;
     }
+
     // normal http request handling here
     let o_url = new URL(o_request.url);
+
+
+    // Check if this is a UUID path and an image request
+    let s_fetch_dest = o_request.headers.get('Sec-Fetch-Dest');
+    let s_accept = o_request.headers.get('Accept') || '';
+    let b_is_image_request = s_fetch_dest === 'image' || (s_accept.includes('image/') && !s_accept.includes('text/html'));
+
+    console.log('sec-fetch-dest: '+s_fetch_dest);
+    if (b_is_image_request) {
+        console.log(o_url.hash)
+        let s_uuid = o_url.hash;
+        try {
+            let s_id_hashed = await f_s_hashed_sha256(s_uuid);
+            let a_n_u8_encrypted = await f_a_n_u8_o_object(s_id_hashed);
+
+            if (a_n_u8_encrypted.length === 0) {
+                return new Response('Not found', { status: 404 });
+            }
+
+            let s_json = await f_s_dectrypted_from_a_n_u8(a_n_u8_encrypted, s_uuid);
+            let o_object = JSON.parse(s_json);
+
+            if (!o_object.s_b64_dataurl_img) {
+                return new Response('No image', { status: 404 });
+            }
+
+            // Convert base64 data URL to binary
+            let s_b64 = o_object.s_b64_dataurl_img;
+            let a_parts = s_b64.match(/^data:([^;]+);base64,(.+)$/);
+            if (!a_parts) {
+                return new Response('Invalid image data', { status: 500 });
+            }
+            let s_mime = a_parts[1];
+            let s_base64 = a_parts[2];
+            let a_n_u8_image = Uint8Array.from(atob(s_base64), c => c.charCodeAt(0));
+
+            return new Response(a_n_u8_image, {
+                headers: { 'Content-Type': s_mime }
+            });
+        } catch (e) {
+            console.error('Image serve error:', e);
+            return new Response('Error', { status: 500 });
+        }
+    }
+
     if(o_url.pathname == '/'){
         return new Response(
             await Deno.readTextFile(
                 `${s_path_abs_folder_current}/localhost/client.html`
             ),
-            { 
+            {
                 headers: {
                     'Content-type': "text/html"
                 }
             }
         );
     }
+
     if(o_url.pathname == '/read'){
         let o_post_data = await o_request.json();
         // console.log(o_post_data)
@@ -379,10 +430,11 @@ let s_name_host2 = (b_development) ? 'localhost': s_name_host;
 //     s_path_certificate_file: './self_signed_cert_b5ddf4af-b818-4b11-96a3-9389d5696641.crt',
 //     s_path_key_file: './self_signed_key_b5ddf4af-b818-4b11-96a3-9389d5696641.key'
 // }
+s_name_host = 'localhost'
 await f_websersocket_serve(
     [
         {
-            n_port: 8082,
+            n_port: 8081,
             b_https: false,
             s_hostname: s_name_host,
             f_v_before_return_response: f_handler
