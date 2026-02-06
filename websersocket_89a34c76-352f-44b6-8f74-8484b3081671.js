@@ -225,15 +225,16 @@ let f_handler = async function(o_request){
     // normal http request handling here
     let o_url = new URL(o_request.url);
 
-    // Check if pathname is a UUID
+    // Check if pathname is a UUID (optionally with .png/.jpg/.jpeg extension)
     let s_uuid_match = o_url.pathname.match(/^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+    let s_uuid_img_match = o_url.pathname.match(/^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(png|jpe?g)$/i);
     let s_fetch_dest = o_request.headers.get('Sec-Fetch-Dest');
     let s_accept = o_request.headers.get('Accept') || '';
-    let b_is_image_request = s_fetch_dest === 'image' || (s_accept.includes('image/') && !s_accept.includes('text/html'));
+    let b_is_image_request = s_uuid_img_match || s_fetch_dest === 'image' || (s_accept.includes('image/') && !s_accept.includes('text/html'));
 
     // If UUID path and image request -> serve the image
-    if (s_uuid_match && b_is_image_request) {
-        let s_uuid = s_uuid_match[1];
+    if ((s_uuid_match || s_uuid_img_match) && b_is_image_request) {
+        let s_uuid = (s_uuid_match || s_uuid_img_match)[1];
         try {
             let s_id_hashed = await f_s_hashed_sha256(s_uuid);
             let a_n_u8_encrypted = await f_a_n_u8_o_object(s_id_hashed);
